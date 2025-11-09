@@ -321,8 +321,17 @@ NODE_ENV=production npm start
 ```
 
 ### Live Demo
-🌐 **Public URL:** [Coming soon - will be deployed to Railway]  
-📹 **Demo Video:** [Coming soon - YouTube demonstration]
+🌐 **Repository:** https://github.com/RitesH000027/Eterna_Ritesh  
+🖥️ **Local Demo:** `node examples/demo-server.js` → http://localhost:3000  
+📹 **Demo Video:** [Coming soon - YouTube demonstration]  
+
+**Quick Test:**
+```bash
+git clone https://github.com/RitesH000027/Eterna_Ritesh
+cd Eterna_Ritesh
+node examples/demo-server.js
+# Open examples/demo.html in browser
+```
 
 ## Use Cases
 

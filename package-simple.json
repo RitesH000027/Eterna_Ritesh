@@ -1,0 +1,15 @@
+{
+  "name": "order-execution-engine",
+  "version": "1.0.0",
+  "description": "High-performance order execution engine with DEX routing",
+  "main": "demo-server.js",
+  "scripts": {
+    "start": "node demo-server.js"
+  },
+  "dependencies": {
+    "fastify": "^4.24.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
