@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Execution Engine - WebSocket Demo</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .order-form { 
+            display: grid; 
+            gap: 10px; 
+            max-width: 400px; 
+        }
+        input, button { 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+        }
+        button { 
+            background: #007bff; 
+            color: white; 
+            cursor: pointer; 
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { 
+            background: #ccc; 
+            cursor: not-allowed; 
+        }
+        .log { 
+            background: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            padding: 15px; 
+            height: 300px; 
+            overflow-y: auto; 
+            font-family: monospace; 
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .status { 
+            padding: 5px 10px; 
+            border-radius: 20px; 
+            font-size: 12px; 
+            font-weight: bold; 
+        }
+        .status.pending { background: #fff3cd; color: #856404; }
+        .status.routing { background: #cce5ff; color: #004085; }
+        .status.building { background: #e2e3e5; color: #383d41; }
+        .status.submitted { background: #d4edda; color: #155724; }
+        .status.confirmed { background: #d1ecf1; color: #0c5460; }
+        .status.failed { background: #f8d7da; color: #721c24; }
+        .orders-list {
+            display: grid;
+            gap: 10px;
+        }
+        .order-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+        .order-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .order-id {
+            font-family: monospace;
+            font-size: 11px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Order Execution Engine - Live Demo</h1>
+    
+    <div class="container">
+        <h2>Submit New Order</h2>
+        <div class="order-form">
+            <input type="text" id="tokenIn" placeholder="Token In (e.g., SOL)" value="So11111111111111111111111111111111111111112">
+            <input type="text" id="tokenOut" placeholder="Token Out (e.g., USDC)" value="EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v">
+            <input type="number" id="amount" placeholder="Amount" value="1000000000">
+            <input type="number" id="slippage" placeholder="Slippage" value="0.01" step="0.001" max="0.5">
+            <button onclick="submitOrder()" id="submitBtn">Execute Order</button>
+            <button onclick="submitMultipleOrders()" id="multiBtn">Submit 5 Orders</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Active Orders</h2>
+        <div id="ordersList" class="orders-list"></div>
+    </div>
+
+    <div class="container">
+        <h2>WebSocket Log</h2>
+        <div id="log" class="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000';
+        const WS_BASE = 'ws://localhost:3000';
+        const activeOrders = new Map();
+        const activeConnections = new Map();
+
+        function log(message) {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logEl.textContent += `[${timestamp}] ${message}\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+        }
+
+        function updateOrdersList() {
+            const listEl = document.getElementById('ordersList');
+            listEl.innerHTML = '';
+            
+            for (const [orderId, order] of activeOrders) {
+                const orderEl = document.createElement('div');
+                orderEl.className = 'order-card';
+                orderEl.innerHTML = `
+                    <div class="order-header">
+                        <span class="status ${order.status}">${order.status.toUpperCase()}</span>
+                        <span class="order-id">${orderId}</span>
+                    </div>
+                    <div>
+                        <strong>${order.tokenIn} → ${order.tokenOut}</strong><br>
+                        Amount: ${(order.amount / 1000000000).toFixed(2)} SOL<br>
+                        ${order.executedPrice ? `Price: ${order.executedPrice.toFixed(6)}` : ''}
+                        ${order.txHash ? `<br>TX: ${order.txHash.substring(0, 16)}...` : ''}
+                        ${order.errorMessage ? `<br>Error: ${order.errorMessage}` : ''}
+                    </div>
+                `;
+                listEl.appendChild(orderEl);
+            }
+        }
+
+        function connectWebSocket(orderId) {
+            if (activeConnections.has(orderId)) return;
+
+            log(`🔌 Starting status polling for order ${orderId}`);
+            
+            // Use HTTP polling instead of WebSocket
+            const pollStatus = async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/orders/${orderId}/status`);
+                    if (!response.ok) {
+                        log(`❌ Status check failed for ${orderId}: ${response.status}`);
+                        return;
+                    }
+                    
+                    const update = await response.json();
+                    const currentOrder = activeOrders.get(orderId);
+                    
+                    // Only log status changes
+                    if (!currentOrder || currentOrder.status !== update.order.status) {
+                        log(`📨 Order ${orderId}: ${update.order.status.toUpperCase()}`);
+                        
+                        if (update.order.status === 'routing') {
+                            log(`🔄 Routing: Finding best price...`);
+                        }
+                        if (update.order.txHash) {
+                            log(`✅ Transaction: ${update.order.txHash}`);
+                        }
+                        if (update.order.executedPrice) {
+                            log(`💰 Executed at: $${update.order.executedPrice}`);
+                        }
+                    }
+
+                    // Update order data
+                    const order = activeOrders.get(orderId) || {};
+                    Object.assign(order, update.order);
+                    activeOrders.set(orderId, order);
+                    updateOrdersList();
+
+                    // Continue polling if not in final state
+                    if (update.order.status === 'pending' || update.order.status === 'routing') {
+                        setTimeout(pollStatus, 1000);
+                    } else {
+                        log(`✅ Order ${orderId} completed with status: ${update.order.status}`);
+                        activeConnections.delete(orderId);
+                    }
+
+                } catch (error) {
+                    log(`❌ Status polling error for ${orderId}: ${error.message}`);
+                    activeConnections.delete(orderId);
+                }
+            };
+
+            activeConnections.set(orderId, { polling: true });
+            pollStatus();
+        }
+
+        async function submitOrder() {
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            try {
+                const orderData = {
+                    tokenIn: document.getElementById('tokenIn').value,
+                    tokenOut: document.getElementById('tokenOut').value,
+                    amount: parseInt(document.getElementById('amount').value),
+                    slippage: parseFloat(document.getElementById('slippage').value)
+                };
+
+                log(`🚀 Submitting order: ${orderData.amount / 1000000000} SOL`);
+
+                const response = await fetch(`${API_BASE}/api/orders/execute`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(orderData)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Order submitted: ${result.orderId}`);
+                    
+                    // Store order data
+                    activeOrders.set(result.orderId, {
+                        ...orderData,
+                        status: result.status
+                    });
+                    updateOrdersList();
+                    
+                    // Connect WebSocket
+                    connectWebSocket(result.orderId);
+                } else {
+                    log(`❌ Order failed: ${result.error}`);
+                }
+
+            } catch (error) {
+                log(`❌ Network error: ${error.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Execute Order';
+            }
+        }
+
+        async function submitMultipleOrders() {
+            const multiBtn = document.getElementById('multiBtn');
+            multiBtn.disabled = true;
+            multiBtn.textContent = 'Submitting 5 orders...';
+
+            try {
+                log(`🚀 Submitting 5 concurrent orders...`);
+                
+                const promises = [];
+                for (let i = 0; i < 5; i++) {
+                    const orderData = {
+                        tokenIn: document.getElementById('tokenIn').value,
+                        tokenOut: document.getElementById('tokenOut').value,
+                        amount: parseInt(document.getElementById('amount').value) + (i * 100000000),
+                        slippage: parseFloat(document.getElementById('slippage').value)
+                    };
+
+                    promises.push(
+                        fetch(`${API_BASE}/api/orders/execute`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(orderData)
+                        }).then(r => r.json()).then(result => ({ orderData, result }))
+                    );
+                }
+
+                const results = await Promise.all(promises);
+                
+                results.forEach(({ orderData, result }, i) => {
+                    if (result.orderId) {
+                        log(`✅ Order ${i + 1} submitted: ${result.orderId}`);
+                        activeOrders.set(result.orderId, {
+                            ...orderData,
+                            status: result.status
+                        });
+                        connectWebSocket(result.orderId);
+                    } else {
+                        log(`❌ Order ${i + 1} failed: ${result.error}`);
+                    }
+                });
+
+                updateOrdersList();
+                log(`🎉 All 5 orders submitted!`);
+
+            } catch (error) {
+                log(`❌ Multi-order error: ${error.message}`);
+            } finally {
+                multiBtn.disabled = false;
+                multiBtn.textContent = 'Submit 5 Orders';
+            }
+        }
+
+        // Check server health on load
+        window.onload = async () => {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const health = await response.json();
+                
+                if (response.ok) {
+                    log(`✅ Server healthy: ${health.status}`);
+                } else {
+                    log(`⚠️ Server issues detected`);
+                }
+            } catch (error) {
+                log(`❌ Server unreachable: ${error.message}`);
+                log(`💡 Make sure to run: npm run dev`);
+            }
+        };
+    </script>
+</body>
+</html>

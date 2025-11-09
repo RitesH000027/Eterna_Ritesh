@@ -1,0 +1,102 @@
+{
+  "info": {
+    "name": "Order Execution Engine API",
+    "description": "High-performance order execution with DEX routing and real-time updates",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": ["{{base_url}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Execute Order",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tokenIn\": \"So11111111111111111111111111111111111111112\",\n  \"tokenOut\": \"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\",\n  \"amount\": 1000000000,\n  \"slippage\": 0.01\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/orders/execute",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", "execute"]
+        }
+      }
+    },
+    {
+      "name": "Get Order Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/orders/{{order_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", "{{order_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Cancel Order",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/orders/{{order_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", "{{order_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Get Statistics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/orders/stats",
+          "host": ["{{base_url}}"],
+          "path": ["api", "orders", "stats"]
+        }
+      }
+    },
+    {
+      "name": "API Documentation",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/docs",
+          "host": ["{{base_url}}"],
+          "path": ["api", "docs"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
