@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Order {
+  id            String    @id @default(uuid())
+  tokenIn       String    
+  tokenOut      String    
+  amount        BigInt    
+  slippage      Float     
+  status        String    @default("pending")
+  selectedDex   String?   
+  estimatedPrice Float?   
+  executedPrice Float?    
+  txHash        String?   
+  errorMessage  String?   
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Execution details
+  actualAmount  BigInt?   
+  gasUsed       BigInt?   
+  
+  // Routing information
+  raydiumQuote  Json?     
+  meteoraQuote  Json?     
+  routingReason String?   
+  
+  @@map("orders")
+}
+
+model ExecutionLog {
+  id          String   @id @default(uuid())
+  orderId     String   
+  event       String   
+  timestamp   DateTime @default(now())
+  data        Json?    
+  level       String   @default("info")
+  
+  @@map("execution_logs")
+}
+
+model SystemMetrics {
+  id                String   @id @default(uuid())
+  timestamp         DateTime @default(now())
+  ordersProcessed   Int      @default(0)
+  ordersSucceeded   Int      @default(0)
+  ordersFailed      Int      @default(0)
+  averageExecTime   Float?   
+  queueDepth        Int      @default(0)
+  activeConnections Int      @default(0)
+  
+  @@map("system_metrics")
+}
