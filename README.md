@@ -321,9 +321,9 @@ NODE_ENV=production npm start
 ```
 
 ### Live Demo
+🚀 **Live Demo:** https://69105d198083303c88e46b04--orderexecutionsystem.netlify.app/  
 🌐 **Repository:** https://github.com/RitesH000027/Eterna_Ritesh  
 🖥️ **Local Demo:** `node examples/demo-server.js` → http://localhost:3000  
-📹 **Demo Video:** [Coming soon - YouTube demonstration]  
 
 **Quick Test:**
 ```bash
