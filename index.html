@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eterna Order Execution Engine - Live Demo</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .order-form { 
+            display: grid; 
+            gap: 10px; 
+            max-width: 400px; 
+        }
+        input, button { 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+        }
+        button { 
+            background-color: #007cba; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+        }
+        button:hover { 
+            background-color: #005a87; 
+        }
+        .status { 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 4px; 
+            font-weight: bold;
+        }
+        .status.pending { 
+            background-color: #fff3cd; 
+            color: #856404; 
+            border: 1px solid #ffeaa7; 
+        }
+        .status.processing { 
+            background-color: #d1ecf1; 
+            color: #0c5460; 
+            border: 1px solid #bee5eb; 
+        }
+        .status.completed { 
+            background-color: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb; 
+        }
+        .status.failed { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+            border: 1px solid #f5c6cb; 
+        }
+        .orders-list { 
+            margin-top: 20px; 
+        }
+        .order-item { 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 4px; 
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+        }
+        .order-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 10px;
+        }
+        .order-id { 
+            font-family: monospace; 
+            background-color: #e9ecef; 
+            padding: 2px 6px; 
+            border-radius: 3px; 
+        }
+        .order-details { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 10px; 
+            font-size: 0.9em;
+        }
+        .github-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #24292e;
+            color: white;
+            padding: 10px 15px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .github-link:hover {
+            background-color: #1a1e22;
+            color: white;
+        }
+        .demo-note {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .feature-list {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .feature-list ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .feature-list li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <a href="https://github.com/RitesH000027/Eterna_Ritesh" target="_blank" class="github-link">
+        📁 View Source Code
+    </a>
+
+    <div class="container">
+        <h1>🚀 Order Execution Engine</h1>
+        <div class="demo-note">
+            <h3>📋 Demo Overview</h3>
+            <p>This is a frontend demo of the Order Execution Engine. The full backend system includes:</p>
+            <div class="feature-list">
+                <ul>
+                    <li>🔥 <strong>High-Performance API</strong> - Fastify server with TypeScript</li>
+                    <li>⚡ <strong>Real-time Updates</strong> - WebSocket connections for live order tracking</li>
+                    <li>🔄 <strong>Queue Processing</strong> - BullMQ for concurrent order handling</li>
+                    <li>💾 <strong>Database Integration</strong> - PostgreSQL with Prisma ORM</li>
+                    <li>🎯 <strong>DEX Routing</strong> - Mock Raydium & Meteora price comparison</li>
+                    <li>📊 <strong>Comprehensive Testing</strong> - 11+ Jest test suites</li>
+                    <li>🐳 <strong>Containerized</strong> - Docker deployment ready</li>
+                </ul>
+            </div>
+            <p><strong>Note:</strong> This frontend simulation demonstrates the user interface and workflow. The complete backend implementation is available in the GitHub repository.</p>
+        </div>
+
+        <h2>📝 Submit Order</h2>
+        <div class="order-form">
+            <input type="text" id="symbol" placeholder="Token Symbol (e.g., SOL/USDC)" value="SOL/USDC">
+            <input type="number" id="amount" placeholder="Amount" value="100" step="0.01">
+            <input type="text" id="side" placeholder="Side (buy/sell)" value="buy">
+            <input type="text" id="type" placeholder="Type (market/limit)" value="market">
+            <input type="number" id="price" placeholder="Price (optional)" step="0.01">
+            <button onclick="submitOrder()">Submit Order</button>
+            <button onclick="submitBatchOrders()">Submit 3 Sample Orders</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>📈 Order Status</h2>
+        <div id="status"></div>
+    </div>
+
+    <div class="container orders-list">
+        <h2>📋 Order History</h2>
+        <div id="orders"></div>
+    </div>
+
+    <script>
+        let orders = [];
+        let orderCounter = 1;
+
+        // Simulate DEX prices
+        const mockPrices = {
+            'SOL/USDC': { raydium: 23.45, meteora: 23.42 },
+            'ETH/USDC': { raydium: 2341.20, meteora: 2340.85 },
+            'BTC/USDC': { raydium: 43567.89, meteora: 43572.15 }
+        };
+
+        function generateOrderId() {
+            return 'ORD-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+        }
+
+        function getBestPrice(symbol, side) {
+            const prices = mockPrices[symbol] || { raydium: 1.00, meteora: 1.01 };
+            if (side === 'buy') {
+                return Math.min(prices.raydium, prices.meteora);
+            } else {
+                return Math.max(prices.raydium, prices.meteora);
+            }
+        }
+
+        function submitOrder() {
+            const symbol = document.getElementById('symbol').value || 'SOL/USDC';
+            const amount = parseFloat(document.getElementById('amount').value) || 100;
+            const side = document.getElementById('side').value || 'buy';
+            const type = document.getElementById('type').value || 'market';
+            const price = parseFloat(document.getElementById('price').value) || null;
+
+            const executionPrice = price || getBestPrice(symbol, side);
+            
+            const order = {
+                id: generateOrderId(),
+                symbol,
+                amount,
+                side,
+                type,
+                price: executionPrice,
+                status: 'pending',
+                createdAt: new Date().toLocaleString(),
+                executedAt: null,
+                dex: executionPrice === mockPrices[symbol]?.raydium ? 'Raydium' : 'Meteora'
+            };
+
+            orders.unshift(order);
+            updateDisplay();
+            processOrder(order);
+        }
+
+        function submitBatchOrders() {
+            const sampleOrders = [
+                { symbol: 'SOL/USDC', amount: 50, side: 'buy', type: 'market' },
+                { symbol: 'ETH/USDC', amount: 2, side: 'sell', type: 'limit', price: 2340.00 },
+                { symbol: 'BTC/USDC', amount: 0.1, side: 'buy', type: 'market' }
+            ];
+
+            sampleOrders.forEach((orderData, index) => {
+                setTimeout(() => {
+                    const executionPrice = orderData.price || getBestPrice(orderData.symbol, orderData.side);
+                    const order = {
+                        id: generateOrderId(),
+                        ...orderData,
+                        price: executionPrice,
+                        status: 'pending',
+                        createdAt: new Date().toLocaleString(),
+                        executedAt: null,
+                        dex: executionPrice === mockPrices[orderData.symbol]?.raydium ? 'Raydium' : 'Meteora'
+                    };
+
+                    orders.unshift(order);
+                    updateDisplay();
+                    processOrder(order);
+                }, index * 500);
+            });
+        }
+
+        function processOrder(order) {
+            // Simulate order processing
+            setTimeout(() => {
+                order.status = 'processing';
+                updateDisplay();
+                
+                setTimeout(() => {
+                    // Simulate 90% success rate
+                    order.status = Math.random() > 0.1 ? 'completed' : 'failed';
+                    order.executedAt = new Date().toLocaleString();
+                    if (order.status === 'failed') {
+                        order.errorMessage = 'Insufficient liquidity';
+                    }
+                    updateDisplay();
+                }, 2000 + Math.random() * 3000);
+                
+            }, 1000);
+        }
+
+        function updateDisplay() {
+            updateStatus();
+            updateOrders();
+        }
+
+        function updateStatus() {
+            const statusEl = document.getElementById('status');
+            const pendingOrders = orders.filter(o => o.status === 'pending').length;
+            const processingOrders = orders.filter(o => o.status === 'processing').length;
+            const completedOrders = orders.filter(o => o.status === 'completed').length;
+            const failedOrders = orders.filter(o => o.status === 'failed').length;
+
+            statusEl.innerHTML = `
+                <div class="status pending">📋 Pending: ${pendingOrders}</div>
+                <div class="status processing">⚡ Processing: ${processingOrders}</div>
+                <div class="status completed">✅ Completed: ${completedOrders}</div>
+                <div class="status failed">❌ Failed: ${failedOrders}</div>
+            `;
+        }
+
+        function updateOrders() {
+            const ordersEl = document.getElementById('orders');
+            
+            if (orders.length === 0) {
+                ordersEl.innerHTML = '<p>No orders yet. Submit an order to see it here!</p>';
+                return;
+            }
+
+            ordersEl.innerHTML = orders.map(order => `
+                <div class="order-item">
+                    <div class="order-header">
+                        <span class="order-id">${order.id}</span>
+                        <span class="status ${order.status}">${order.status.toUpperCase()}</span>
+                    </div>
+                    <div class="order-details">
+                        <div><strong>Symbol:</strong> ${order.symbol}</div>
+                        <div><strong>Amount:</strong> ${order.amount}</div>
+                        <div><strong>Side:</strong> ${order.side.toUpperCase()}</div>
+                        <div><strong>Type:</strong> ${order.type.toUpperCase()}</div>
+                        <div><strong>Price:</strong> $${order.price.toFixed(2)}</div>
+                        <div><strong>DEX:</strong> ${order.dex}</div>
+                        <div><strong>Created:</strong> ${order.createdAt}</div>
+                        <div><strong>Executed:</strong> ${order.executedAt || 'Pending'}</div>
+                    </div>
+                    ${order.errorMessage ? `<div style="color: red; margin-top: 10px;"><strong>Error:</strong> ${order.errorMessage}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        // Initialize display
+        updateDisplay();
+
+        // Auto-refresh every 500ms to simulate real-time updates
+        setInterval(() => {
+            if (orders.some(o => o.status === 'pending' || o.status === 'processing')) {
+                updateDisplay();
+            }
+        }, 500);
+    </script>
+</body>
+</html>
